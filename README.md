@@ -25,4 +25,6 @@ NOTAS:
 * Un archivo llamado "DML queries.sql" Que contiene los queries para el llenado de datos de las tablas que son necesarias más adelante para realizar las consultas.
 * Un archivo llamado "Queires solicitados.sql" que contiene los queries de las consultas solicitadas
 
+4- En el archivo "resources.txt" encontrarás links a los recursor de diseño de base de datos y diseño de diagrama de clases en draw.io → Esto para tener una segunda forma de visualización aunque ya están en las carpetas mencionadas anteriormente en formato pdf.
+
   
