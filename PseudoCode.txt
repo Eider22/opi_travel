@@ -1,0 +1,222 @@
+FLUJO CLIENTE PARA CREAR UNA SOLICITUD:
+
+Un cliente visita la parte pública de la aplicación
+Lista los viajes que ofrece la compañia
+Revisa carácteristicas generales como precio de compra,precio reserva, tipo de transporte, etc
+Selecciona un viaje de su interés
+Prepara solicitud al viaje de su interés. Opcionalmente puede seleccionar servicios extra que serán asociados a la solicitud como preferencias
+Crea la solicitud
+a lasolicitud se le asocia un tipo(reserva o compra), estop depende de la fecha en la que este siento hecha la solicitud, si es anterior a la fecha del viaje es reserva, si es la misma fecha del viaje es compra(esto puede ser modificado por requerimientos)
+Selecciona el tipo de pago
+Hace el pago
+Se envía la solicitud
+
+NOTA: Para todos los pseudocodigos, tener en cuenta que la aplicación se diseñó con una arquitectura de capas(controller, services, repositories)
+
+    Pseudo código:
+	* Cuando el cliente entra a listar los viajes:
+		NOTA: En cada capa los dtos se validan basandose en esquemas de DTOS 
+		      Al pasarse entre capa y capa un dto es mapeado de acuerdo a lo que la capa necesite recibir(si esta recibiendo el dto) y retornar(si esta retornando el dto)
+
+		Llega la request al endpoint con elmétodo list() en el TravelController
+		Se inyecta el servicio TravelService en el controlador
+		se llama al método list() del servicio
+		Se inyecta en el servicio el repositorio TravelRepository
+		se llama al método lis() del repositorio
+		El repositorio se comunica con la db y obtiene la lista de servicios en estado activo
+		El repositorio retorna la lista(DTOS) o lanza un error
+		El servicio recibe la lista(DTOs) o el error y lo trata
+		El servicio retorna la lista(DTOs) al controlador o le lanza un error personalizado
+		El controlador toma la lista(DTOs) o captura el error 
+		El controlador response al cliente con una lista o un error
+
+		* Cuando el cliente selecciona un viaje de su interés
+		Llega la request al endpoint con elmétodo findById(Integer id) en el TravelController
+		Se inyecta el servicio TravelService en el controlador
+		Se valida que llegue el id
+		El id es capturado
+		se llama al método findById(Integer id) del servicio y se le pasa el id
+		Se inyecta en el servicio el repositorio TravelRepository
+		se llama al método findById(Integer id) del repositorio y se le pasa el id
+		El repositorio se comunica con la db y obtiene el Travel buscado por el id
+		El repositorio retorna la el TravelDTO o lanza un error
+		El servicio recibe el travel o el error y lo trata
+		El servicio retorna el travelDTO al controlador o le lanza un error personalizado
+		El controlador toma el travelDTO o captura el error 
+		El controlador response al cliente con el travel o un error
+
+	* Cuando el cliente crea su solicitud
+		NOTA: En cada capa los dtos se validan basandose en esquemas de DTOS 
+		      Al pasarse entre capa y capa un dto es mapeado de acuerdo a lo que la capa necesite recibir(si esta recibiendo el dto) y retornar(si esta retornando el dto)
+
+		Llega la request al endpoint con elmétodo create(RequestTravelDto requestTravel) en el RequestTravelcontroller
+		Se inyecta el servicio RequestTravelService en el controlador
+		Se valida que llegue correctamente el cuerpo de la request con el esquema del RequestTravelDto 
+		se llama al método create(RequestTravelDto requestTravel) del servicio y se le pasa el RequestTravelDto 
+		Se inyecta en el servicio el repositorio RequestTravelRepository
+		Se inyecta en el servicio el repositorio CustomerRepository
+		Se inyecta en el servicio el repositorio TravelRepository
+
+		- En el servicio:
+		- Validamos que el cliente sea mayor de edad
+			NOTA: Siendo una fase exploratoria pediremos luego pediremos más detalle de requerimientos para saber que hacer con el pago
+		-Se le da a la requestTravel un estado de paga
+
+		Suponiendo que estamos usando una librería para el mapeo de las relaciones, un servicio de notificaciones y un microservicio de seguridad para identificación de usuario,login,etc:
+		-  a través de CustomerRepository usando el método findByDocument(String documentNumber) buscamos si el cliente ya existe
+		   Si existe le notificamos al correo que no necesita volver a llenar el formulario público completo la próxima vez que necesite hacer una solicitud
+		   ya que anteriormente ha hecho solicitudes y tiene un usuario creado y se le envían sus credenciales con intrucciones para logearse.
+		   Si no existe
+		   lo creamos y nos comunicamos con el microservicio de seguridad para crearle un usuario
+		   Se notifica por correo con un enlace para validar su correo, unas credenciales y un mensaje de bienvenida e intrucciones para validar su correo.
+
+		- Iniciamos una trasacción
+		-  Se llama al método create(RequestTravelDto requestTravel) del repositorio y se le pasa el requestTravelDto
+		-  a través de RequestTravelRepository(usando HasManyThrough relation con AditionalService a través de la tabla intermedia "Preferencias") 
+		   asociamos las preferencias seleccionadas a la solicitud, eso solo en caso de que el cliente haya seleccionado servicios extra.		
+	
+		- a través del TravelRepository buscamos el travel y a través de la relación Belongs to de Travel con Travel_state
+		  validamos si el viaje se encuentra en estado activo
+		  Si no es así, hacemos un rollback y retornamos una respuesta personalizada que diga que el viaje no está activo en este momento
+			NOTA:solo se listan los viajes en estado activo y esto no debería pasar, hay pocas probabilidades de que se dé, 
+		      	pero se puede dar y es mejor validarlo hasta que los requerimientos digan lo contrario. Además se tendría que tener en cuenta
+		      	cosas como, qué pasaría con el pago que ya hizo el cliente, pero esto ya requiere de más detalles a nivel de requerimientos.
+		  -  a través de RequestTravelRepository(usando BelongsTo relation con Customer) asociamos la solicitud
+	   	   creada al cliente
+	          - Si algo falla, hacemos roolback
+
+		
+
+	
+		
+		El repositorio se comunica con la db y crea la RequestTravel 
+		El repositorio retorna la RequestTravelDTO o lanza un error
+		El servicio recibe la RequestTravelDTO o el error y lo trata
+		El servicio retorna la RequestTravelDTO al controlador o le lanza un error personalizado
+		El controlador toma la RequestTravelDTO o captura el error 
+		El controlador response al cliente con el la RequestTravelDTOo un error
+
+
+
+FLUJO ADMINISTRADOR PARA CREAR UN VIAJE:
+El admin se logea
+El admin va al menú de viajes
+El admin crea un nuevo viaje
+	Al viaje le puede crear o seleccionar servicios extra que ya están creados
+
+NOTA: Para todos los pseudocodigos, tener en cuenta que la aplicación se diseñó con una arquitectura de capas(controller, services, repositories)
+
+
+    Pseudo código:
+	* Cuando el admin quiere crear un viaje:
+		NOTA: En cada capa los dtos se validan basandose en esquemas de DTOS 
+		      Al pasarse entre capa y capa un dto es mapeado de acuerdo a lo que la capa necesite recibir(si esta recibiendo el dto) y retornar(si esta retornando el dto)
+
+		Llega la request al endpoint con el método create(TravelDto travel) en el TravelController
+		Ante de entrar al cuerpo del controller se valida:
+ 			-que el usuario tenga un token
+			-que tenga un rol de amin
+		Si no pasa la validación anterior seretorna un error de autorización(Unauthorized)
+		Si pasa la validación anterior, simplemente sigue
+
+		Se inyecta el servicio TravelService en el controlador
+		se llama al método create(TravelDto travel) del servicio
+
+		Se inyecta en el servicio el repositorio TravelRepository
+		En el servicio:
+			-Se da un estado de inactivo al viaje ya que este dato no debe venir del front
+				NOTA:Esto es una estrategia para que el viaje no sea publicado hasta que el admin lo termine de contruir y este seguro de quererlo publicar
+				esto le permite revisarlo y hacer correcciones antes de publicarlo(pasar su estado a activo)
+			-El resto de deatos si vienen desde el front
+				- Se valida que la fecha de salida(departure_date) sea mayor a la actual
+				- Se valida que la ciudad de origen sea diferente de la ciudad destino
+				- Se hacen el resto de validaciones que se requieran
+				- Se inicia una transacción
+				-se llama al método create(TravelDto travel) del repositorio
+				- Se valida si el cuerpo del dto viene con servicios adicionales
+					Suponiendo que estamos usando una librería para el mapeo de las relaciones:
+						Si viene con servicios adicionales, se registran en la tabla Additional_servicea asociados al viaje creado usando el TravelRepository a través de la relación hasMany  desde TravelRepository  hacia Additional_service
+				-Si alguna de las dos consultas anteriores falla se hace un roolback de la transacción y se retorna un error personalizado al controller para que este response al front
+				
+
+		El repositorio se comunica con la db y crea el viaje en un estado inactivo
+		El repositorio retorna el TravelDto o lanza un error
+		El servicio recibe el TravelDto o el error y lo trata
+		El servicio retorna el TravelDto al controlador o le lanza un error personalizado
+		El controlador toma el TravelDto o captura el error 
+		El controlador response al cliente con una respuesta exitosa y en su cuerpo un travel o un error
+
+		* Cuando el cliente selecciona un viaje de su interés
+		Llega la request al endpoint con elmétodo findById(Integer id) en el TravelController
+		Se inyecta el servicio TravelService en el controlador
+		Se valida que llegue el id
+		El id es capturado
+		se llama al método findById(Integer id) del servicio y se le pasa el id
+		Se inyecta en el servicio el repositorio TravelRepository
+		se llama al método findById(Integer id) del repositorio y se le pasa el id
+		El repositorio se comunica con la db y obtiene el Travel buscado por el id
+		El repositorio retorna la el TravelDTO o lanza un error
+		El servicio recibe el travel o el error y lo trata
+		El servicio retorna el travelDTO al controlador o le lanza un error personalizado
+		El controlador toma el travelDTO o captura el error 
+		El controlador response al cliente con el travel o un error
+
+
+
+	NOTA: En vista de que ya hay una arquitectura y marco de trabajo definido para el desarrollo del código
+		el resto de procesos serán desarrollados de formas similares, por lo tanto para efectos prácticos de la prueba 
+		a continuación solo haré anotaciones importantes para cada proceso ya que sería demasiado describir uno por uno 
+		con pseudocódigo y esto se puede hacer a medida que se vaya necesitando, pues como dije ya contamos con 
+		una arquitectura y un marco que nos da las pautas desarrollar cada proceso necesario.
+
+		
+
+		* Cuando el admin quiere listar viajes y aplicar filtros:	
+			-Se debe autenticar y validar rol y permisos ya que tendra filtrados dinámicos de forma libre
+			-Cuando liste los viajes solo se debe retornar información básica(teniendo en cuenta los filtros) para ser visualizada en una tabla.
+				Toda la info detallada se retornará cuando se haga la solicitud a un endpoint de ver detalles del viaje
+
+		* Cuando el admin y el cliente quieren ver los detalles de un viaje:
+			- No es necearia autenticación ya que esta infromación es pública
+			- Se retornan al front todos los detalles de un viaje
+
+
+		* Cuando el admin quiere eliminar un viaje:	
+			-Se debe autenticar y validar rol y permisos
+
+		* Cuando el admin quiere editar un viaje:	
+			-Se debe autenticar y validar rol y permisos
+	
+		* Cuando el admin quiere cancelar un viaje:
+			-Se debe autenticar y validar rol y permisos
+			-Se deben cancelar todaslas solicitudes
+			-Se debe verificar a nivel de requerimientos como se manejará los pagos hechos por los clientes
+
+		* Cuando el Cliente quiere listar viajes y aplicar filtros:
+			- Solo se le puede permitir aplicar determinados filtros ya que esta información es pública y no se pueden exponer filtros
+			  de forma libre, puede filtrar por ejemplo por ciudad origen, ciudad destino, tipo de transporte, precio...
+
+		* Cuando el cliente quiere listar sus solicitudes:
+			-Se debe autenticar y validar rol y permisos			
+			-Se deben hacer las validaciones que nos diga la lógica del negocio en requerimientos más detallados
+			-Se deben buscar las solicitudes asociadas a este cliente
+
+		* Cuando el cliente quiere ver detalles de una solicitud:
+			-Se debe autenticar y validar rol y permisos
+			-Se debe validar que la solicitud este asociada a ese cliente
+			-Se deben hacer las validaciones que nos diga la lógica del negocio en requerimientos más detallados
+
+		* Cuando el cliente quiere cancelar una solicitud:
+			-Se debe autenticar y validar rol y permisos
+			-Se debe validar que la solicitud este asociada a ese cliente
+			-Se deben hacer las validaciones que nos diga la lógica del negocio en requerimientos más detallados
+
+		NOTA: Un cliente no puede editar una solicitud, pues a esta ya ha sido paga. Es mejor que la cancele y cree otra.
+		      Esto es una solución que claramente puede cambiar según requerimientos futuros.
+
+
+		NOTAS FINALES: 
+			* Para todas las entidades se debe hacer un CRUD para que el admin pueda administrarlas, excepto para las solicitudes,
+			  pues es importante asegurar la integridad de esa información ya que es creada por los clientes. también para entidades
+			  como por ejemplo el tipo de documento, se pueden sembrar datos y no hacer CRUD para esta, pero esto depende de los requerimientos.
+
